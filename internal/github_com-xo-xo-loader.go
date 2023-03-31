@@ -3,8 +3,9 @@
 package internal
 
 import (
-	"github.com/xo/xo/loader"
 	"reflect"
+
+	"github.com/xo/xo/loader"
 )
 
 func init() {
@@ -29,6 +30,7 @@ func init() {
 		"Register":             reflect.ValueOf(loader.Register),
 		"Schema":               reflect.ValueOf(loader.Schema),
 		"Sqlite3GoType":        reflect.ValueOf(loader.Sqlite3GoType),
+		"Sqlite3PythonType":    reflect.ValueOf(loader.Sqlite3PythonType),
 		"SqlserverGoType":      reflect.ValueOf(loader.SqlserverGoType),
 		"SqlserverViewStrip":   reflect.ValueOf(loader.SqlserverViewStrip),
 		"StdlibPostgresGoType": reflect.ValueOf(loader.StdlibPostgresGoType),

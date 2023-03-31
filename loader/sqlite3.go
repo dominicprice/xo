@@ -69,3 +69,44 @@ func Sqlite3GoType(d xo.Type, schema, itype, utype string) (string, string, erro
 	}
 	return goType, zero, nil
 }
+
+// Sqlite3PythonType parse a sqlite3 type into a Python type based on the column
+// definition.
+func Sqlite3PythonType(d xo.Type, schema, itype, utype string) (string, string, error) {
+	var pythonType, zero string
+	switch d.Type {
+	case "bool", "boolean":
+		pythonType, zero = "bool", "False"
+		if d.Nullable {
+			pythonType, zero = "Optional[bool]", "None"
+		}
+	case "int", "integer", "tinyint", "smallint", "mediumint", "bigint":
+		pythonType, zero = itype, "0"
+		if d.Nullable {
+			pythonType, zero = "Optional[int]", "None"
+		}
+	case "numeric", "real", "double", "float", "decimal":
+		pythonType, zero = "float", "0.0"
+		if d.Nullable {
+			pythonType, zero = "Optional[float]", "None"
+		}
+	case "blob":
+		pythonType, zero = "bytes", "b''"
+		if d.Nullable {
+			pythonType, zero = "Optional[bytes]", "None"
+		}
+	case "timestamp", "datetime", "date", "timestamp with timezone", "time with timezone", "time without timezone", "timestamp without timezone":
+		pythonType, zero = "datetime.datetime", "datetime.datetime.fromtimestamp(0)"
+		if d.Nullable {
+			pythonType, zero = "Optional[datetime.datetime]", "None"
+		}
+	default:
+		// case "varchar", "character", "varying character", "nchar", "native character", "nvarchar", "text", "clob", "time":
+		pythonType, zero = "str", "''"
+		if d.Nullable {
+			pythonType, zero = "Optional[str]", "None"
+		}
+	}
+
+	return pythonType, zero, nil
+}
