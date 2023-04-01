@@ -11,48 +11,6 @@ class {{ $e.PythonName }}(IntEnum):
 
 {{ end }}
 
-{{ define "foreignkey" }}
-{{- $k := .Data -}}
-
-    {{ recv (func_name $k) $k }}:
-        """
-        Returns the {{ $k.RefTable }} associated with the
-        {{ $k.Table.PythonName }}'s ({{ names "" $k.Fields }})
-
-        Generated from foreign key '{{ $k.SQLName }}'.
-        """
-        return {{ foreign_key $k }}
-
-{{ end }}
-
-{{ define "index" }}
-{{- $i := .Data }}
-    @staticmethod
-    {{ func (func_name $i) $i }}:
-        """
-        Retrieves a row from the '{{schema $i.Table.SQLName }}' as a {{ $i.Table.PythonName }}.
-
-        Generated from '{{ $i.SQLName }}'.
-        """
-        # query
-        {{ sqlstr "index" "            " $i }}
-
-        # run
-        {{ db "execute" $i }}
-{{- if $i.IsUnique }}
-        row = cursor.fetchone()
-        if row is None:
-            raise NotFoundError
-        return {{ $i.Table.PythonName }}(*row)
-{{- else }}
-        res: list[{{ $i.Table.PythonName }}] = []
-        while row := cursor.fetchone():
-            res += [{{ $i.Table.PythonName }}(*row)
-        return res 
-{{ end -}}
-
-{{end}}
-
 {{ define "procs" }}
 
 # Procedures are not currently implemented
@@ -62,6 +20,14 @@ class {{ $e.PythonName }}(IntEnum):
 
 {{ define "typedef" }}
 {{- $t := .Data -}}
+
+{{ if $t.Imports }}
+# Imports required for foreign key relations
+{{ range $t.Imports }}
+import {{ pkg }}.{{ . }} as {{ . }}
+{{ end }}
+{{ end }}
+
 class {{ $t.PythonName }}:
     """
 {{- if $t.Comment -}}
@@ -70,11 +36,7 @@ class {{ $t.PythonName }}:
     {{ $t.PythonName }} represents a row from '{{ schema $t.SQLName }}'.
 {{- end }}
     """
-    def __init__(self,
-{{- range $t.Fields }}
-        {{ .PythonName }}: {{ .Type }} = {{ .Zero }},
-{{- end }}
-    ):
+    def __init__(self, {{ params $t.Fields true true }}):
 {{- range $t.Fields }}
         self.{{ .PythonName }} = {{ .PythonName }}
 {{- end }}
@@ -113,13 +75,13 @@ class {{ $t.PythonName }}:
         {{ sqlstr "insert_manual" "            " $t }}
 
         # run
-        {{ db "execute" $t }}
+        {{ cursor_execute_self $t }}
 {{ else }}
         # insert (primary key generated and returned by database)
         {{ sqlstr "insert" "            " $t }}
 
         # run
-        {{ db "execute" $t }}
+        {{ cursor_execute_self $t }}
         self.{{ (index $t.PrimaryKeys 0).PythonName }} = cursor.lastrowid
 {{- end }}
         self._exists = True
@@ -140,7 +102,7 @@ class {{ $t.PythonName }}:
         {{ sqlstr "update" "            " $t }}
 
         # run
-        {{ db_update "execute" $t }}
+        {{ cursor_update_self $t }}
 {{ end }}
 
     def save(self, cursor: Cursor):
@@ -164,7 +126,7 @@ class {{ $t.PythonName }}:
         {{ sqlstr "upsert" "            " $t }}
 
         # run
-        {{ db "execute" $t }}
+        {{ cursor_execute_self $t }}
         # set exists
         self._exists = True
 
@@ -180,15 +142,63 @@ class {{ $t.PythonName }}:
         {{ sqlstr "delete" "            " $t }}
 
         # run
-        {{ db "execute" (index $t.PrimaryKeys 0).PythonName }}
+        {{ cursor_execute_self (index $t.PrimaryKeys 0).PythonName }}
 {{ else }}
         # delete with composite primary key
         {{ sqlstr "delete" "            " $t }}
 
         # run
-        {{ db "execute" $t.PrimaryKeys }}
+        {{ cursor_execute_self $t.PrimaryKeys }}
 {{- end }}
+
         # set deleted
         self._deleted = True
 
 {{ end }}
+
+{{ define "foreignkey" }}
+{{- $k := .Data }}
+    def {{ $k.RefFunc }}(self, cursor: Cursor) -> '{{ $k.Import }}.{{ $k.RefTable }}':
+        """
+        Returns the {{ $k.RefTable }} associated with the
+        {{ $k.Table.PythonName }}'s ({{ names false "" $k.Fields }})
+
+        Generated from foreign key '{{ $k.SQLName }}'.
+        """
+{{- range $k.Fields }}
+{{- if .IsOptional }}
+        if self.{{ .PythonName }} is None:
+            raise ValueError
+{{- end }}
+{{- end }}
+        return {{ foreign_key_from_self $k }}
+
+{{ end }}
+
+{{ define "index" }}
+{{- $i := .Data }}
+    @staticmethod
+    def {{ func_signature $i false }}:
+        """
+        Retrieves a row from the '{{schema $i.Table.SQLName }}' as a {{ $i.Table.PythonName }}.
+
+        Generated from '{{ $i.SQLName }}'.
+        """
+        # query
+        {{ sqlstr "index" "            " $i }}
+
+        # run
+        {{ cursor_execute $i }}
+{{- if $i.IsUnique }}
+        row = cursor.fetchone()
+        if row is None:
+            raise NotFoundError
+        return {{ $i.Table.PythonName }}(*row)
+{{- else }}
+        res: list[{{ $i.Table.PythonName }}] = []
+        while row := cursor.fetchone():
+            res += [{{ $i.Table.PythonName }}(*row)]
+        return res 
+{{ end -}}
+
+{{end}}
