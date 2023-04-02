@@ -195,10 +195,7 @@ class {{ $t.PythonName }}:
             raise NotFoundError
         return {{ $i.Table.PythonName }}(*row)
 {{- else }}
-        res: list[{{ $i.Table.PythonName }}] = []
-        while row := cursor.fetchone():
-            res += [{{ $i.Table.PythonName }}(*row)]
-        return res 
+        return [{{ $i.Table.PythonName }}(*row) for row in cursor.fetchall()]
 {{ end -}}
 
 {{end}}
