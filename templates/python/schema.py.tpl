@@ -82,7 +82,7 @@ class {{ $t.PythonName }}:
 
         # run
         {{ cursor_execute_self $t }}
-        self.{{ (index $t.PrimaryKeys 0).PythonName }} = cursor.lastrowid
+        self.{{ (index $t.PrimaryKeys 0) }} = cursor.lastrowid
 {{- end }}
         self._exists = True
 
@@ -196,6 +196,6 @@ class {{ $t.PythonName }}:
         return {{ $i.Table.PythonName }}(*row)
 {{- else }}
         return [{{ $i.Table.PythonName }}(*row) for row in cursor.fetchall()]
-{{ end -}}
+{{ end }}
 
 {{end}}

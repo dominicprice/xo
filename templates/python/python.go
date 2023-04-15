@@ -53,6 +53,7 @@ func Init(ctx context.Context, f func(xo.TemplateType)) error {
 				Desc:       "enable append mode",
 				Short:      "a",
 				Aliases:    []string{"append"},
+				Default:    "false",
 			},
 			{
 				ContextKey: NotFirstKey,
@@ -65,11 +66,6 @@ func Init(ctx context.Context, f func(xo.TemplateType)) error {
 				ContextKey: PkgKey,
 				Type:       "string",
 				Desc:       "package name",
-			},
-			{
-				ContextKey: TagKey,
-				Type:       "[]string",
-				Desc:       "build tags",
 			},
 			{
 				ContextKey: ImportKey,
@@ -141,6 +137,12 @@ func Init(ctx context.Context, f func(xo.TemplateType)) error {
 			if err != nil {
 				return err
 			}
+
+			pkgImports := []string{}
+			for file := range files {
+				pkgImports = append(pkgImports, Pkg(ctx)+"."+file[:len(file)-3])
+			}
+
 			// If -2 is provided, skip package template outputs as requested.
 			// If -a is provided, skip to avoid duplicating the template.
 			if !NotFirst(ctx) && !Append(ctx) {
@@ -148,8 +150,12 @@ func Init(ctx context.Context, f func(xo.TemplateType)) error {
 					Partial: "db",
 					Dest:    "db.py",
 				})
-				// Don't generate header for db.xo.go.
-				files["db.py"] = struct{}{}
+
+				emit(xo.Template{
+					Partial: "init",
+					Dest:    "__init__.py",
+					Data:    pkgImports,
+				})
 			}
 			if Append(ctx) {
 				for filename := range files {
@@ -216,71 +222,46 @@ const (
 	AppendKey     xo.ContextKey = "append"
 	KnownTypesKey xo.ContextKey = "known-types"
 	NotFirstKey   xo.ContextKey = "not-first"
-	ArrayModeKey  xo.ContextKey = "array-mode"
 	PkgKey        xo.ContextKey = "pkg"
-	TagKey        xo.ContextKey = "tag"
 	ImportKey     xo.ContextKey = "import"
-	UUIDKey       xo.ContextKey = "uuid"
 	CustomKey     xo.ContextKey = "custom"
 	ConflictKey   xo.ContextKey = "conflict"
 	InitialismKey xo.ContextKey = "initialism"
 	EscKey        xo.ContextKey = "esc"
-	FieldTagKey   xo.ContextKey = "field-tag"
-	ContextKey    xo.ContextKey = "context"
 	InjectKey     xo.ContextKey = "inject"
 	InjectFileKey xo.ContextKey = "inject-file"
-	OracleTypeKey xo.ContextKey = "oracle-type"
 )
 
 // Append returns append from the context.
 func Append(ctx context.Context) bool {
-	b, _ := ctx.Value(AppendKey).(bool)
+	b, _ := ctx.Value(xo.ContextKey(AppendKey)).(bool)
 	return b
 }
 
 // KnownTypes returns known-types from the context.
 func KnownTypes(ctx context.Context) map[string]struct{} {
-	m, _ := ctx.Value(KnownTypesKey).(map[string]struct{})
+	m, _ := ctx.Value(xo.ContextKey(KnownTypesKey)).(map[string]struct{})
 	return m
 }
 
 // NotFirst returns not-first from the context.
 func NotFirst(ctx context.Context) bool {
-	b, _ := ctx.Value(NotFirstKey).(bool)
+	b, _ := ctx.Value(xo.ContextKey(NotFirstKey)).(bool)
 	return b
-}
-
-// ArrayMode returns array-mode from the context.
-func ArrayMode(ctx context.Context) string {
-	s, _ := ctx.Value(ArrayMode).(string)
-	return s
 }
 
 // Pkg returns pkg from the context.
 func Pkg(ctx context.Context) string {
-	s, _ := ctx.Value(PkgKey).(string)
+	s, _ := ctx.Value(xo.ContextKey(PkgKey)).(string)
 	if s == "" {
 		s = filepath.Base(xo.Out(ctx))
 	}
 	return s
 }
 
-// Tags returns tags from the context.
-func Tags(ctx context.Context) []string {
-	v, _ := ctx.Value(TagKey).([]string)
-	// build tags
-	var tags []string
-	for _, tag := range v {
-		if tag != "" {
-			tags = append(tags, tag)
-		}
-	}
-	return tags
-}
-
 // Imports returns package imports from the context.
 func Imports(ctx context.Context) []string {
-	v, _ := ctx.Value(ImportKey).([]string)
+	v, _ := ctx.Value(xo.ContextKey(ImportKey)).([]string)
 	// build imports
 	var imports []string
 	for _, s := range v {
@@ -288,58 +269,36 @@ func Imports(ctx context.Context) []string {
 			imports = append(imports, s)
 		}
 	}
-	// add uuid import
-	if s, _ := ctx.Value(UUIDKey).(string); s != "" {
-		imports = append(imports, s)
-	}
 	return imports
 }
 
 // Custom returns the custom package from the context.
 func Custom(ctx context.Context) string {
-	s, _ := ctx.Value(CustomKey).(string)
+	s, _ := ctx.Value(xo.ContextKey(CustomKey)).(string)
 	return s
 }
 
 // Conflict returns conflict from the context.
 func Conflict(ctx context.Context) string {
-	s, _ := ctx.Value(ConflictKey).(string)
+	s, _ := ctx.Value(xo.ContextKey(ConflictKey)).(string)
 	return s
 }
 
 // Esc indicates if esc should be escaped based from the context.
 func Esc(ctx context.Context, esc string) bool {
-	v, _ := ctx.Value(EscKey).([]string)
+	v, _ := ctx.Value(xo.ContextKey(EscKey)).([]string)
 	return !contains(v, "none") && (contains(v, "all") || contains(v, esc))
-}
-
-// FieldTag returns field-tag from the context.
-func FieldTag(ctx context.Context) string {
-	s, _ := ctx.Value(FieldTagKey).(string)
-	return s
-}
-
-// Context returns context from the context.
-func Context(ctx context.Context) string {
-	s, _ := ctx.Value(ContextKey).(string)
-	return s
 }
 
 // Inject returns inject from the context.
 func Inject(ctx context.Context) string {
-	s, _ := ctx.Value(InjectKey).(string)
+	s, _ := ctx.Value(xo.ContextKey(InjectKey)).(string)
 	return s
 }
 
 // InjectFile returns inject-file from the context.
 func InjectFile(ctx context.Context) string {
-	s, _ := ctx.Value(InjectFileKey).(string)
-	return s
-}
-
-// OracleType returns oracle-type from the context.
-func OracleType(ctx context.Context) string {
-	s, _ := ctx.Value(OracleTypeKey).(string)
+	s, _ := ctx.Value(xo.ContextKey(InjectFileKey)).(string)
 	return s
 }
 
@@ -428,7 +387,6 @@ func TemplateFuncMap(ctx context.Context) (template.FuncMap, error) {
 		schema:     schema,
 		nth:        nth,
 		pkg:        Pkg(ctx),
-		tags:       Tags(ctx),
 		imports:    Imports(ctx),
 		conflict:   Conflict(ctx),
 		custom:     Custom(ctx),
@@ -436,7 +394,6 @@ func TemplateFuncMap(ctx context.Context) (template.FuncMap, error) {
 		escTable:   Esc(ctx, "table"),
 		escColumn:  Esc(ctx, "column"),
 		inject:     inject,
-		oracleType: OracleType(ctx),
 		knownTypes: KnownTypes(ctx),
 	}
 	return funcs.Get(), nil
@@ -468,11 +425,11 @@ type TemplateFunctions struct {
 func (f *TemplateFunctions) Get() template.FuncMap {
 	return template.FuncMap{
 		// general
-		"first":   f.fileIsFirst,
-		"driver":  f.driverOneOf,
-		"schema":  f.joinNamesWithSchema,
-		"pkg":     f.packageName,
-		"imports": f.packageImports,
+		"first":   f.firstFn,
+		"driver":  f.driverFn,
+		"schema":  f.schemaFn,
+		"pkg":     f.pkgFn,
+		"imports": f.importsFn,
 		"inject":  f.injectedContent,
 
 		// func and query
@@ -498,11 +455,18 @@ func (f *TemplateFunctions) Get() template.FuncMap {
 		// helpers
 		"check_name": f.checkName,
 		"eval":       f.eval,
+		"join": func(fields []Field) string {
+			res := ""
+			for _, f := range fields {
+				res += f.PythonName + ", "
+			}
+			return res
+		},
 	}
 }
 
-// fileIsFirst returns true if the file is the first outputted
-func (f *TemplateFunctions) fileIsFirst() bool {
+// firstFn returns true if the file is the first outputted
+func (f *TemplateFunctions) firstFn() bool {
 	if f.first {
 		f.first = false
 		return true
@@ -510,8 +474,8 @@ func (f *TemplateFunctions) fileIsFirst() bool {
 	return false
 }
 
-// driverOneOf returns true if the driver is any of the passed drivers.
-func (f *TemplateFunctions) driverOneOf(drivers ...string) bool {
+// driverFn returns true if the driver is any of the passed drivers.
+func (f *TemplateFunctions) driverFn(drivers ...string) bool {
 	for _, driver := range drivers {
 		if f.driver == driver {
 			return true
@@ -520,8 +484,8 @@ func (f *TemplateFunctions) driverOneOf(drivers ...string) bool {
 	return false
 }
 
-// joinNamesWithSchema takes a series of names and joins them with the schema name.
-func (f *TemplateFunctions) joinNamesWithSchema(names ...string) string {
+// schemaFn takes a series of names and joins them with the schema name.
+func (f *TemplateFunctions) schemaFn(names ...string) string {
 	s := f.schema
 	// escape table names
 	if f.escTable {
@@ -546,13 +510,13 @@ func (f *TemplateFunctions) joinNamesWithSchema(names ...string) string {
 	return s + n
 }
 
-// packageName returns the package name.
-func (f *TemplateFunctions) packageName() string {
+// pkgFn returns the package name.
+func (f *TemplateFunctions) pkgFn() string {
 	return f.pkg
 }
 
-// packageImports returns the imports.
-func (f *TemplateFunctions) packageImports() []PackageImport {
+// importsFn returns the imports.
+func (f *TemplateFunctions) importsFn() []PackageImport {
 	var imports []PackageImport
 	for _, s := range f.imports {
 		alias, pkg := "", s
@@ -970,7 +934,7 @@ func (f *TemplateFunctions) sqlstr_insert_base(all bool, v interface{}) []string
 			n++
 		}
 		return []string{
-			"INSERT INTO " + f.joinNamesWithSchema(x.SQLName) + " (",
+			"INSERT INTO " + f.schemaFn(x.SQLName) + " (",
 			strings.Join(fields, ", "),
 			") VALUES (",
 			strings.Join(vals, ", "),
@@ -1048,7 +1012,7 @@ func (f *TemplateFunctions) sqlstr_update_base(prefix string, v interface{}) (in
 		}
 		name := ""
 		if prefix == "" {
-			name = f.joinNamesWithSchema(x.SQLName) + " "
+			name = f.schemaFn(x.SQLName) + " "
 		}
 		return n, []string{
 			"UPDATE " + name + "SET ",
@@ -1141,9 +1105,9 @@ func (f *TemplateFunctions) sqlstr_upsert_sqlserver_oracle(v interface{}) []stri
 		// merge [table]...
 		switch f.driver {
 		case "sqlserver":
-			lines = []string{"MERGE " + f.joinNamesWithSchema(x.SQLName) + " AS t "}
+			lines = []string{"MERGE " + f.schemaFn(x.SQLName) + " AS t "}
 		case "oracle":
-			lines = []string{"MERGE " + f.joinNamesWithSchema(x.SQLName) + "t "}
+			lines = []string{"MERGE " + f.schemaFn(x.SQLName) + "t "}
 		}
 		// using (select ..)
 		var fields, predicate []string
@@ -1205,7 +1169,7 @@ func (f *TemplateFunctions) sqlstr_delete(v interface{}) []string {
 			list = append(list, fmt.Sprintf("%s = %s", f.colname(z), f.nth(i)))
 		}
 		return []string{
-			"DELETE FROM " + f.joinNamesWithSchema(x.SQLName) + " ",
+			"DELETE FROM " + f.schemaFn(x.SQLName) + " ",
 			"WHERE " + strings.Join(list, " AND "),
 		}
 	}
@@ -1229,7 +1193,7 @@ func (f *TemplateFunctions) sqlstr_index(v interface{}) []string {
 		return []string{
 			"SELECT ",
 			strings.Join(fields, ", ") + " ",
-			"FROM " + f.joinNamesWithSchema(x.Table.SQLName) + " ",
+			"FROM " + f.schemaFn(x.Table.SQLName) + " ",
 			"WHERE " + strings.Join(list, " AND "),
 		}
 	}
@@ -1267,7 +1231,7 @@ func (f *TemplateFunctions) sqlstr_proc(v interface{}) []string {
 			list = append(list, s)
 		}
 		// dont prefix with schema for oracle
-		name := f.joinNamesWithSchema(x.SQLName)
+		name := f.schemaFn(x.SQLName)
 		if f.driver == "oracle" {
 			name = x.SQLName
 		}
@@ -1298,7 +1262,7 @@ func (f *TemplateFunctions) sqlstr_func(v interface{}) []string {
 			list = append(list, f.nth(i))
 		}
 		return []string{
-			fmt.Sprintf(format, f.joinNamesWithSchema(x.SQLName), strings.Join(list, ", ")),
+			fmt.Sprintf(format, f.schemaFn(x.SQLName), strings.Join(list, ", ")),
 		}
 	}
 	return []string{fmt.Sprintf("[[ UNSUPPORTED TYPE 28: %T ]]", v)}
@@ -1490,7 +1454,9 @@ func convertFKey(ctx context.Context, t Table, fk xo.ForeignKey) (ForeignKey, er
 		refFields = append(refFields, refField)
 	}
 
-	imp := strings.ToLower(fk.RefTable)
+	refTable := pascal(singularize(fk.RefTable))
+
+	imp := strings.ToLower(refTable)
 	imp = strings.ReplaceAll(imp, "_", "")
 
 	funcParts := []string{}
@@ -1503,7 +1469,7 @@ func convertFKey(ctx context.Context, t Table, fk xo.ForeignKey) (ForeignKey, er
 		SQLName:    fk.Name,
 		Table:      t,
 		Fields:     fields,
-		RefTable:   pascal(singularize(fk.RefTable)),
+		RefTable:   pascal(singularize(refTable)),
 		RefFields:  refFields,
 		RefFunc:    snake(fk.RefFunc),
 		Import:     imp,
@@ -1693,18 +1659,13 @@ func buildQueryName(query xo.Query) string {
 	if query.Name != "" {
 		return query.Name
 	}
-	// generate name if not specified
-	name := query.Type
-	if !query.One {
-		name = inflector.Pluralize(name)
-	}
-	// add params
+	name := ""
 	if len(query.Params) == 0 {
 		name = "get"
 	} else {
 		name += "by"
 		for _, p := range query.Params {
-			name += pascal(p.Name)
+			name += "_" + snake(p.Name)
 		}
 	}
 	return name
