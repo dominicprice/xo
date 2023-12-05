@@ -623,5 +623,6 @@ func (src sourceFS) Open(name string) (fs.File, error) {
 //go:embed dot
 //go:embed go
 //go:embed json
+//go:embed python
 //go:embed yaml
 var files embed.FS
